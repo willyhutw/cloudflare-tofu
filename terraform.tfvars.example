@@ -1,4 +1,5 @@
 domain = "willyhu.tw"
 
-# github_ipv4 = "185.199.108.153"      # default
-# github_ipv6 = "2606:50c0:8000::153"  # default
+# github_ipv4    = "185.199.108.153"      # default
+# github_ipv6    = "2606:50c0:8000::153"  # default
+# worker_enabled = true                   # default

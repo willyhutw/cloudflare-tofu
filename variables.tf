@@ -41,3 +41,9 @@ variable "github_ipv6" {
   type        = string
   default     = "2606:50c0:8000::153"
 }
+
+variable "worker_enabled" {
+  description = "Enable or disable the DNS failover Worker cron trigger"
+  type        = bool
+  default     = true
+}
