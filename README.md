@@ -72,6 +72,20 @@ cloudflare-tofu/
     └── worker.js              # DNS failover Worker script
 ```
 
+## DNS Failover Worker
+
+The failover Worker is disabled by default. To enable/disable:
+
+```bash
+# Disable
+tofu apply -var="worker_enabled=false"
+
+# Enable (default)
+tofu apply
+```
+
+This only controls the cron trigger. The Worker script and DNS records are unaffected.
+
 ## Notes
 
 - A/AAAA record content is managed by the Worker at runtime. OpenTofu ignores content drift via `lifecycle { ignore_changes }`.
