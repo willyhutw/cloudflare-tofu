@@ -1,0 +1,5 @@
+export TF_VAR_cloudflare_api_token="your-api-token"
+export TF_VAR_cloudflare_account_id="your-account-id"
+export TF_VAR_cloudflare_zone_id="your-zone-id"
+export TF_VAR_homelab_ipv4="your-homelab-ipv4"
+export TF_VAR_homelab_ipv6="your-homelab-ipv6"
