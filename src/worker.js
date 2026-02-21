@@ -7,7 +7,7 @@ async function checkHealth(env) {
     const socket = connect({ hostname: env.HOMELAB_IPV4, port: 80 });
     const writer = socket.writable.getWriter();
     await writer.write(new TextEncoder().encode(
-      `GET /health/ HTTP/1.1\r\nHost: ${env.DOMAIN}\r\nConnection: close\r\n\r\n`
+      `GET /health/ HTTP/1.1\r\nHost: ${env.HOMELAB_IPV4}\r\nConnection: close\r\n\r\n`
     ));
     writer.releaseLock();
 
