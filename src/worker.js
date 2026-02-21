@@ -2,7 +2,7 @@ const CF_API = "https://api.cloudflare.com/client/v4";
 
 async function checkHealth(env) {
   try {
-    const response = await fetch(`http://${env.HOMELAB_IPV4}/health`, {
+    const response = await fetch(`http://${env.HOMELAB_IPV4}/health/`, {
       headers: { Host: env.DOMAIN },
       signal: AbortSignal.timeout(5000),
     });
