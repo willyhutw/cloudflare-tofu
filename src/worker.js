@@ -1,12 +1,23 @@
+import { connect } from "cloudflare:sockets";
+
 const CF_API = "https://api.cloudflare.com/client/v4";
 
 async function checkHealth(env) {
   try {
-    const response = await fetch(`http://${env.HOMELAB_IPV4}/health/`, {
-      headers: { Host: env.DOMAIN },
-      signal: AbortSignal.timeout(5000),
-    });
-    return response.ok;
+    const socket = connect({ hostname: env.HOMELAB_IPV4, port: 80 });
+    const writer = socket.writable.getWriter();
+    await writer.write(new TextEncoder().encode(
+      `GET /health/ HTTP/1.1\r\nHost: ${env.DOMAIN}\r\nConnection: close\r\n\r\n`
+    ));
+    writer.releaseLock();
+
+    const reader = socket.readable.getReader();
+    const { value } = await reader.read();
+    await socket.close();
+
+    const text = new TextDecoder().decode(value);
+    const statusCode = parseInt(text.split(" ")[1]);
+    return statusCode >= 200 && statusCode < 300;
   } catch {
     return false;
   }

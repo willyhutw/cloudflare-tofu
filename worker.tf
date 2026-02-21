@@ -1,6 +1,12 @@
 resource "cloudflare_worker" "dns_failover" {
   account_id = var.cloudflare_account_id
   name       = "dns-failover"
+
+  observability = {
+    logs = {
+      enabled = true
+    }
+  }
 }
 
 resource "cloudflare_worker_version" "dns_failover" {
@@ -69,7 +75,7 @@ resource "cloudflare_workers_cron_trigger" "dns_failover" {
   count       = var.worker_enabled ? 1 : 0
   account_id  = var.cloudflare_account_id
   script_name = cloudflare_worker.dns_failover.name
-  schedules   = [{ cron = "*/1 * * * *" }]
+  schedules   = [{ cron = "*/5 * * * *" }]
 
   depends_on = [cloudflare_workers_deployment.dns_failover]
 }
