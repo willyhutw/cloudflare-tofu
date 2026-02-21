@@ -70,4 +70,6 @@ resource "cloudflare_workers_cron_trigger" "dns_failover" {
   account_id  = var.cloudflare_account_id
   script_name = cloudflare_worker.dns_failover.name
   schedules   = [{ cron = "*/1 * * * *" }]
+
+  depends_on = [cloudflare_workers_deployment.dns_failover]
 }
