@@ -4,7 +4,8 @@ resource "cloudflare_worker" "dns_failover" {
 
   observability = {
     logs = {
-      enabled = true
+      enabled          = true
+      invocation_logs  = false
     }
   }
 }
