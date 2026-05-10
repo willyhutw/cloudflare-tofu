@@ -4,8 +4,12 @@ Manage Cloudflare DNS records and DNS failover Worker with OpenTofu.
 
 ```
 Cron (every 5 min) → Worker checks homelab /health via TCP
-  ├── UP   → DNS A/AAAA → homelab IP  (proxied=true,  hides real IP behind CF)
-  └── DOWN → DNS A/AAAA → GitHub Pages IP (proxied=false, required by GitHub Pages)
+  ├── UP   → willyhu.tw A/AAAA → homelab IP      (proxied=true,  hides real IP behind CF)
+  └── DOWN → willyhu.tw A/AAAA → GitHub Pages IP (proxied=false, required by GitHub Pages)
+
+www.willyhu.tw CNAME → willyhu.tw (always proxied=true)
+  ├── Homelab UP:   CF proxy → homelab
+  └── Homelab DOWN: CF proxy → GitHub Pages  (GitHub Pages supports CF proxy on www)
 ```
 
 ## Prerequisites
@@ -90,5 +94,6 @@ This only controls the cron trigger. The Worker script and DNS records are unaff
 ## Notes
 
 - A/AAAA record `content`, `proxied`, and `ttl` are managed by the Worker at runtime. OpenTofu ignores drift on these fields via `lifecycle { ignore_changes }`.
-- When pointing to homelab, `proxied=true` hides the real IP behind Cloudflare edges. When pointing to GitHub Pages, `proxied=false` is required for GitHub Pages to function correctly.
+- When pointing to homelab, `proxied=true` hides the real IP behind Cloudflare edges. When pointing to GitHub Pages, `proxied=false` is required for the apex domain.
+- `www.willyhu.tw` CNAME is permanently `proxied=true`. When DNS fails over to GitHub Pages, Cloudflare proxies `www` traffic to GitHub Pages, which supports this setup as long as `www.willyhu.tw` is configured as a custom domain in the GitHub Pages settings.
 - CNAME (`www` → root domain) is fully managed by OpenTofu.
