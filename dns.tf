@@ -11,7 +11,7 @@ resource "cloudflare_dns_record" "root_a" {
   proxied = false
 
   lifecycle {
-    ignore_changes = [content, comment]
+    ignore_changes = [content, comment, proxied, ttl]
   }
 }
 
@@ -24,7 +24,7 @@ resource "cloudflare_dns_record" "root_aaaa" {
   proxied = false
 
   lifecycle {
-    ignore_changes = [content, comment]
+    ignore_changes = [content, comment, proxied, ttl]
   }
 }
 

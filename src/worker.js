@@ -32,30 +32,31 @@ async function getDnsRecords(env, type) {
   return data.result || [];
 }
 
-async function updateDnsRecord(env, recordId, type, content, comment) {
+async function updateDnsRecord(env, recordId, type, content, comment, proxied) {
   await fetch(`${CF_API}/zones/${env.CLOUDFLARE_ZONE_ID}/dns_records/${recordId}`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ content, comment, proxied: false }),
+    body: JSON.stringify({ content, comment, proxied }),
   });
 }
 
 async function switchDns(env, target) {
   const ipv4 = target === "homelab" ? env.HOMELAB_IPV4 : env.GITHUB_IPV4;
   const ipv6 = target === "homelab" ? env.HOMELAB_IPV6 : env.GITHUB_IPV6;
+  const proxied = target === "homelab";
   const comment = `Switched to ${target} by dns-failover worker at ${new Date().toISOString()}`;
 
   const aRecords = await getDnsRecords(env, "A");
   const aaaaRecords = await getDnsRecords(env, "AAAA");
 
   for (const record of aRecords) {
-    await updateDnsRecord(env, record.id, "A", ipv4, comment);
+    await updateDnsRecord(env, record.id, "A", ipv4, comment, proxied);
   }
   for (const record of aaaaRecords) {
-    await updateDnsRecord(env, record.id, "AAAA", ipv6, comment);
+    await updateDnsRecord(env, record.id, "AAAA", ipv6, comment, proxied);
   }
 
   console.log(`DNS switched to ${target} (A: ${ipv4}, AAAA: ${ipv6})`);
