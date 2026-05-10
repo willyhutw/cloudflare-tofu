@@ -3,9 +3,9 @@
 Manage Cloudflare DNS records and DNS failover Worker with OpenTofu.
 
 ```
-Cron (every minute) → Worker checks homelab /health
-  ├── UP   → DNS A/AAAA → homelab IP
-  └── DOWN → DNS A/AAAA → GitHub Pages IP
+Cron (every 5 min) → Worker checks homelab /health via TCP
+  ├── UP   → DNS A/AAAA → homelab IP  (proxied=true,  hides real IP behind CF)
+  └── DOWN → DNS A/AAAA → GitHub Pages IP (proxied=false, required by GitHub Pages)
 ```
 
 ## Prerequisites
@@ -51,8 +51,9 @@ If resources already exist in Cloudflare (e.g. after OS reinstall and state is l
 The script automatically:
 
 1. Fetches DNS record IDs from Cloudflare API via `curl` + `jq`
-2. Runs `tofu init` if not already initialized
-3. Imports all DNS records (A, AAAA, CNAME) and Worker resources
+2. Fetches the latest Worker version and deployment IDs
+3. Runs `tofu init` if not already initialized
+4. Imports all DNS records (A, AAAA, CNAME) and Worker resources (script, version, deployment, cron trigger)
 
 After import, run `tofu plan` to verify state matches the actual resources.
 
@@ -88,5 +89,6 @@ This only controls the cron trigger. The Worker script and DNS records are unaff
 
 ## Notes
 
-- A/AAAA record content is managed by the Worker at runtime. OpenTofu ignores content drift via `lifecycle { ignore_changes }`.
+- A/AAAA record `content`, `proxied`, and `ttl` are managed by the Worker at runtime. OpenTofu ignores drift on these fields via `lifecycle { ignore_changes }`.
+- When pointing to homelab, `proxied=true` hides the real IP behind Cloudflare edges. When pointing to GitHub Pages, `proxied=false` is required for GitHub Pages to function correctly.
 - CNAME (`www` → root domain) is fully managed by OpenTofu.
