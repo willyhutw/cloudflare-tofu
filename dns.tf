@@ -33,6 +33,6 @@ resource "cloudflare_dns_record" "www_cname" {
   name    = "www"
   type    = "CNAME"
   content = var.domain
-  ttl     = 60
-  proxied = false
+  ttl     = 1
+  proxied = true
 }
