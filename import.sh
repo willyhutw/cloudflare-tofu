@@ -15,6 +15,41 @@ ACCOUNT_ID="$TF_VAR_cloudflare_account_id"
 DOMAIN="${TF_VAR_domain:-willyhu.tw}"
 CF_API="https://api.cloudflare.com/client/v4"
 
+# Decide how to initialize BEFORE any API calls, so we never fail halfway.
+# `tofu init -backend=false` does NOT work while main.tf declares `backend "s3" {}`:
+# init reports success, but every later state command (import/plan/apply) fails with
+# "Backend initialization required". Local state requires commenting out the block first.
+BACKEND_ACTIVE=false
+if grep -qE '^[[:space:]]*backend "s3"' main.tf; then
+  BACKEND_ACTIVE=true
+fi
+
+if [[ ! -d .terraform ]]; then
+  if [[ -f backend.hcl ]]; then
+    echo "Running tofu init with R2 backend (backend.hcl)..."
+    tofu init -backend-config=backend.hcl
+  elif [[ "$BACKEND_ACTIVE" == false ]]; then
+    echo "backend \"s3\" is commented out in main.tf; running tofu init -backend=false (local state)..."
+    tofu init -backend=false
+  else
+    cat >&2 <<'MSG'
+Error: backend.hcl not found and main.tf still declares `backend "s3" {}`.
+`tofu init -backend=false` would "succeed" but every tofu import below would fail.
+
+Either use the R2 remote state (preferred; the state bucket must already exist):
+  cp backend.hcl.example backend.hcl        # replace <ACCOUNT_ID>
+  # set AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in .envrc, then: direnv allow
+  ./import.sh
+
+Or import into a temporary LOCAL state (e.g. the state bucket does not exist yet):
+  sed -i 's|^  backend "s3" {}|  # backend "s3" {}  # TEMP: local state for bootstrap|' main.tf
+  ./import.sh
+  # then follow README "First-time bootstrap" (restore main.tf, -migrate-state)
+MSG
+    exit 1
+  fi
+fi
+
 # Fetch DNS record IDs
 echo "Fetching DNS record IDs for ${DOMAIN}..."
 RECORDS=$(curl -s "${CF_API}/zones/${ZONE_ID}/dns_records?name=${DOMAIN}&order=type" \
@@ -42,19 +77,6 @@ DEPLOYMENT_ID=$(curl -s "${CF_API}/accounts/${ACCOUNT_ID}/workers/scripts/dns-fa
 
 echo "  Worker version:    ${VERSION_ID:-not found}"
 echo "  Worker deployment: ${DEPLOYMENT_ID:-not found}"
-
-# Initialize if needed
-if [[ ! -d .terraform ]]; then
-  echo ""
-  if [[ -f backend.hcl ]]; then
-    echo "Running tofu init with R2 backend (backend.hcl)..."
-    tofu init -backend-config=backend.hcl
-  else
-    echo "backend.hcl not found; running tofu init -backend=false (local state)."
-    echo "  To use the R2 remote state: cp backend.hcl.example backend.hcl, set AWS_* in .envrc, then re-run tofu init -backend-config=backend.hcl"
-    tofu init -backend=false
-  fi
-fi
 
 # Import DNS records
 echo ""

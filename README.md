@@ -54,7 +54,7 @@ tofu apply
 
 ## Import Existing Resources
 
-If resources already exist in Cloudflare (e.g. after OS reinstall and state is lost), import them into OpenTofu state before applying:
+If resources already exist in Cloudflare but **no state exists anywhere** (neither locally nor in the R2 state bucket), import them into OpenTofu state before applying:
 
 ```bash
 ./import.sh
@@ -64,10 +64,15 @@ The script automatically:
 
 1. Fetches DNS record IDs from Cloudflare API via `curl` + `jq`
 2. Fetches the latest Worker version and deployment IDs
-3. Runs `tofu init` if not already initialized (`-backend-config=backend.hcl` if present, otherwise `-backend=false` with local state)
+3. Runs `tofu init` if not already initialized, before any import:
+   - `backend.hcl` present → `tofu init -backend-config=backend.hcl` (R2 remote state)
+   - `backend "s3"` commented out in `main.tf` → `tofu init -backend=false` (local state)
+   - otherwise → prints the fix-up recipe and exits 1 (see [Why not just `-backend=false`?](#why-not-just--backendfalse))
 4. Imports all DNS records (A, AAAA, CNAME) and Worker resources (script, version, deployment, cron trigger)
 
 After import, run `tofu plan` to verify state matches the actual resources.
+
+> If the state is only lost locally but still in R2, do **not** import; see [State lost locally, state bucket intact](#state-lost-locally-state-bucket-intact).
 
 ## Project Structure
 
@@ -135,36 +140,52 @@ aws s3 cp etcd-snapshot.db s3://willyhutw-homelab-backup/micro/etcd/ \
 
 `main.tf` declares an empty `backend "s3" {}` (partial configuration). The actual settings live in the gitignored `backend.hcl`, copied from `backend.hcl.example`. Locking uses OpenTofu's S3-native lock file (`use_lockfile = true`), no DynamoDB needed.
 
+### Why not just `-backend=false`?
+
+While `main.tf` declares `backend "s3" {}`, `tofu init -backend=false` (with or without `-reconfigure`) prints "OpenTofu has been successfully initialized!", but every later `tofu plan` / `apply` / `import` / `state list` fails with:
+
+```
+Error: Backend initialization required, please run "tofu init"
+Reason: Initial configuration of the requested backend "s3"
+```
+
+So to work with **local** state (only needed before the state bucket exists), the backend block must be commented out temporarily.
+
 ### First-time bootstrap
 
-The state bucket is managed by this repo, so it must exist before the state can move into it:
+The state bucket is managed by this repo, so it has to be created with local state first, then the state is migrated into it:
 
 ```bash
-# 1. Init without backend (state stays local)
+# 1. Temporarily disable the backend block (otherwise step 3 fails, see above)
+sed -i 's|^  backend "s3" {}|  # backend "s3" {}  # TEMP: local state for bootstrap|' main.tf
+
+# 2. Init with local state
 tofu init -backend=false
 
-# 2. Create only the R2 resources, state still local
-tofu apply \
-  -target=cloudflare_r2_bucket.homelab_backup \
-  -target=cloudflare_r2_bucket_lifecycle.homelab_backup \
-  -target=cloudflare_r2_bucket.tofu_state \
-  -target=cloudflare_r2_bucket_lifecycle.tofu_state
+# 3. Create the resources (incl. both R2 buckets); state is written to ./terraform.tfstate
+tofu plan
+tofu apply
 
-# 3. Create the state-backend R2 S3 token (see above), put AWS_* in .envrc, then direnv allow
+# 4. Restore the backend block
+git checkout -- main.tf
+
+# 5. Create the state-backend R2 S3 token (see "R2 S3 credentials"),
+#    put AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in .envrc, then:
+direnv allow
 cp backend.hcl.example backend.hcl   # replace <ACCOUNT_ID>
 
-# 4. Migrate local state into R2
+# 6. Move the local state into R2 (answer "yes" to copy existing state)
 tofu init -migrate-state -backend-config=backend.hcl
 
-# 5. Verify
+# 7. Verify: should report "No changes"
 tofu plan
 ```
 
-After migration, the local `terraform.tfstate*` files are no longer used.
+After migration, the local `terraform.tfstate*` files are no longer used (keep a copy until `tofu plan` is clean, then delete them).
 
-### Reinstall / new machine
+### Daily use / reinstall / new machine
 
-Restore `.envrc` and `backend.hcl` (both gitignored, e.g. from a password manager or synced storage), then:
+Restore `.envrc` (incl. `AWS_*`) and `backend.hcl` (both gitignored, e.g. from a password manager or synced storage), then:
 
 ```bash
 direnv allow
@@ -172,7 +193,20 @@ tofu init -backend-config=backend.hcl
 tofu plan
 ```
 
-No `./import.sh` is needed once state lives in R2.
+### State lost locally, state bucket intact
+
+Losing the local checkout / `.terraform/` does **not** lose the state; it lives in `willyhutw-tofu-state`. Do **not** use `-backend=false` and do **not** run `./import.sh`; just reconnect to R2:
+
+```bash
+cp backend.hcl.example backend.hcl   # replace <ACCOUNT_ID>, if backend.hcl was lost too
+# restore AWS_* in .envrc (or create a new state-backend R2 S3 token), then:
+direnv allow
+tofu init -backend-config=backend.hcl   # add -reconfigure if .terraform/ points elsewhere
+tofu state list                         # resources should be listed
+tofu plan
+```
+
+Only if the state object itself is gone from R2 (or the bucket is gone) fall back to `./import.sh` (with `backend.hcl` if the bucket still exists, otherwise via [First-time bootstrap](#first-time-bootstrap)).
 
 ## Notes
 
