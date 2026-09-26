@@ -1,0 +1,21 @@
+# OpenTofu S3 backend config for Cloudflare R2 (partial config for `backend "s3" {}` in main.tf).
+#   cp backend.hcl.example backend.hcl   # backend.hcl is gitignored
+#   tofu init -backend-config=backend.hcl
+# Credentials come from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (R2 S3 token, see .envrc.example).
+
+bucket = "willyhutw-tofu-state"
+key    = "cloudflare-tofu/terraform.tfstate"
+region = "auto"
+
+endpoints = {
+  s3 = "https://<ACCOUNT_ID>.r2.cloudflarestorage.com"
+}
+
+# S3-native lock file in the same bucket (no DynamoDB; OpenTofu >= 1.10).
+use_lockfile = true
+
+skip_credentials_validation = true
+skip_region_validation      = true
+skip_requesting_account_id  = true
+skip_metadata_api_check     = true
+use_path_style              = true

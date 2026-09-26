@@ -16,3 +16,8 @@ output "r2_backup_bucket_name" {
   description = "R2 bucket name for homelab backups"
   value       = cloudflare_r2_bucket.homelab_backup.name
 }
+
+output "r2_tofu_state_bucket_name" {
+  description = "R2 bucket name for OpenTofu remote state"
+  value       = cloudflare_r2_bucket.tofu_state.name
+}

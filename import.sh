@@ -46,8 +46,14 @@ echo "  Worker deployment: ${DEPLOYMENT_ID:-not found}"
 # Initialize if needed
 if [[ ! -d .terraform ]]; then
   echo ""
-  echo "Running tofu init..."
-  tofu init
+  if [[ -f backend.hcl ]]; then
+    echo "Running tofu init with R2 backend (backend.hcl)..."
+    tofu init -backend-config=backend.hcl
+  else
+    echo "backend.hcl not found; running tofu init -backend=false (local state)."
+    echo "  To use the R2 remote state: cp backend.hcl.example backend.hcl, set AWS_* in .envrc, then re-run tofu init -backend-config=backend.hcl"
+    tofu init -backend=false
+  fi
 fi
 
 # Import DNS records
