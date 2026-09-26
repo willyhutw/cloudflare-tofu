@@ -24,14 +24,15 @@ if grep -qE '^[[:space:]]*backend "s3"' main.tf; then
   BACKEND_ACTIVE=true
 fi
 
-if [[ ! -d .terraform ]]; then
-  if [[ -f backend.hcl ]]; then
-    echo "Running tofu init with R2 backend (backend.hcl)..."
-    tofu init -backend-config=backend.hcl
-  elif [[ "$BACKEND_ACTIVE" == false ]]; then
-    echo "backend \"s3\" is commented out in main.tf; running tofu init -backend=false (local state)..."
-    tofu init -backend=false
-  else
+# Always (re)run the right init: a stale .terraform (left over from a local-state bootstrap)
+# must not cause the imports below to fail with "Backend initialization required".
+if [[ -f backend.hcl ]]; then
+  echo "Running tofu init with R2 backend (backend.hcl)..."
+  tofu init -backend-config=backend.hcl
+elif [[ "$BACKEND_ACTIVE" == false ]]; then
+  echo "backend \"s3\" is commented out in main.tf; running tofu init -backend=false (local state)..."
+  tofu init -backend=false
+else
     cat >&2 <<'MSG'
 Error: backend.hcl not found and main.tf still declares `backend "s3" {}`.
 `tofu init -backend=false` would "succeed" but every tofu import below would fail.
@@ -46,8 +47,7 @@ Or import into a temporary LOCAL state (e.g. the state bucket does not exist yet
   ./import.sh
   # then follow README "First-time bootstrap" (restore main.tf, -migrate-state)
 MSG
-    exit 1
-  fi
+  exit 1
 fi
 
 # Fetch DNS record IDs
