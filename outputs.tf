@@ -11,3 +11,8 @@ output "dns_record_ids" {
     www_cname = cloudflare_dns_record.www_cname.id
   }
 }
+
+output "r2_backup_bucket_name" {
+  description = "R2 bucket name for homelab backups"
+  value       = cloudflare_r2_bucket.homelab_backup.name
+}
