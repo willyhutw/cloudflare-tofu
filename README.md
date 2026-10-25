@@ -5,7 +5,7 @@ Manage Cloudflare DNS records, DNS failover Worker, and R2 buckets (homelab back
 ```
 Cron (every 5 min) → Worker checks homelab /health via TCP
   ├── UP   → willyhu.tw A/AAAA → homelab IP      (proxied=true,  hides real IP behind CF)
-  └── DOWN → willyhu.tw A/AAAA → GitHub Pages IP (proxied=false, required by GitHub Pages)
+  └── DOWN → willyhu.tw A/AAAA → GitHub Pages IP (proxied=true,  CF terminates TLS; GitHub 301s to www)
 
 www.willyhu.tw CNAME → willyhu.tw (always proxied=true)
   ├── Homelab UP:   CF proxy → homelab
@@ -177,6 +177,8 @@ No `./import.sh` is needed once state lives in R2.
 ## Notes
 
 - A/AAAA record `content`, `proxied`, and `ttl` are managed by the Worker at runtime. OpenTofu ignores drift on these fields via `lifecycle { ignore_changes }`.
-- When pointing to homelab, `proxied=true` hides the real IP behind Cloudflare edges. When pointing to GitHub Pages, `proxied=false` is required for the apex domain.
+- The Worker keeps the apex `proxied=true` for both targets. When pointing to homelab, this hides the real IP behind Cloudflare edges. When pointing to GitHub Pages, GitHub never has its own certificate for this domain (it can't provision one while `www` is proxied), so a DNS-only apex would serve GitHub's `*.github.io` certificate and fail TLS. Proxied, Cloudflare terminates TLS and GitHub answers with a 301 to `https://www.willyhu.tw/`.
+- Because GitHub has no certificate, the zone's SSL/TLS mode must **not** be Full (strict) (it would return 526). Don't enable GitHub's "Enforce HTTPS" while the mode is Flexible, or it will loop.
+- If the apex record is ever found DNS-only, the Worker re-applies the current target on its next run.
 - `www.willyhu.tw` CNAME is permanently `proxied=true`. When DNS fails over to GitHub Pages, Cloudflare proxies `www` traffic to GitHub Pages, which supports this setup as long as `www.willyhu.tw` is configured as a custom domain in the GitHub Pages settings.
 - CNAME (`www` → root domain) is fully managed by OpenTofu.

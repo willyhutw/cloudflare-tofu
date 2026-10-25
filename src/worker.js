@@ -46,7 +46,9 @@ async function updateDnsRecord(env, recordId, type, content, comment, proxied) {
 async function switchDns(env, target) {
   const ipv4 = target === "homelab" ? env.HOMELAB_IPV4 : env.GITHUB_IPV4;
   const ipv6 = target === "homelab" ? env.HOMELAB_IPV6 : env.GITHUB_IPV6;
-  const proxied = target === "homelab";
+  // Always proxied: GitHub Pages never gets its own cert for this domain (www is
+  // proxied), so a DNS-only apex would be served GitHub's *.github.io cert.
+  const proxied = true;
   const comment = `Switched to ${target} by dns-failover worker at ${new Date().toISOString()}`;
 
   const aRecords = await getDnsRecords(env, "A");
@@ -81,6 +83,9 @@ export default {
     } else if (!healthy && pointingToHomelab) {
       console.log("Homelab is DOWN, switching DNS to GitHub Pages...");
       await switchDns(env, "github");
+    } else if (!aRecords[0].proxied) {
+      console.log("Record not proxied, re-applying current target...");
+      await switchDns(env, pointingToHomelab ? "homelab" : "github");
     } else {
       console.log(`No change needed (healthy: ${healthy}, target: ${pointingToHomelab ? "homelab" : "github"})`);
     }
